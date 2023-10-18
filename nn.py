@@ -2,6 +2,7 @@ import csv
 import random
 import math
 import json
+import time
 
 class Neuron:
     def __init__(self):
@@ -14,8 +15,12 @@ class Neuron:
 
 data = []
 y = []
+test_data_ratio = 0.2 # 10% dos dados serão separados para teste
+learning_ratio = 0.3    
+MAX_PATIANCE = 5
+
 result_row = 'FTR'
-unused_headers = ['FTHG', 'FTAG', 'HTR', 'HF', 'AF', 'HY', 'AY', 'HomeTeam', 'AwayTeam', 'HS', 'AS', 'ID'] # Talvez tirar os HALF TIME
+unused_headers = ['FTHG', 'FTAG', 'HTR', 'HomeTeam', 'AwayTeam', 'ID'] 
 
 with open("./Dataset_futebol.csv", 'r') as file:
     reader = csv.reader(file, delimiter=";")
@@ -50,7 +55,6 @@ with open("./Dataset_futebol.csv", 'r') as file:
         for row in data:
             row[key] = (row[key] - lowest) / (biggest - lowest)
 
-test_data_ratio = 0.2 # 10% dos dados serão separados para teste
 def generate_test_data(x):
     classes_occurrences = {}
     for result in y:
@@ -82,12 +86,14 @@ def generate_test_data(x):
 
 data, test_data, y, test_y = generate_test_data(data)
 
+print(len(data), len(test_data))
+
 num_headers = len(headers)
 last_layer = 3
 layers_size = [num_headers, (num_headers + last_layer) // 2, last_layer]
 layers_indexes_ranges = []  
 
-learning_ratio = 0.3
+print(layers_size)
 
 s = 0
 for size in layers_size:
@@ -138,7 +144,6 @@ def exec_neural_network_for_row(row):
         results.append(neurons[neuron_index].value)
     return results
 
-MAX_PATIANCE = 20
 last_epoch_error = 0
 current_patiance = 0
 best_wheights_matrix = weights_matrix
@@ -153,7 +158,6 @@ while True: # Loop de épocas
             neuron = neurons[neuron_index]
             error_fator = (expected_results[idx] - neuron.value)
             neuron.error = neuron.value * (1 - neuron.value) * error_fator
-            # print(neuron.error, error_fator, neuron.value, expected_results[idx])
             current_epoch_error += abs(neuron.error)
 
         for neuron_index in range(layers_indexes_ranges[0], layers_indexes_ranges[1]):
@@ -173,7 +177,7 @@ while True: # Loop de épocas
                         weights_matrix[neuron_index][next_layer_neuron_index] + learning_ratio * \
                         current_neuron_value * next_layer_neuron_error
     
-    if last_epoch_error < current_epoch_error:
+    if last_epoch_error - 0.4 < current_epoch_error:
         current_patiance += 1
         print(f"-------------------- ÉPOCA PIORRRRRR --------------------- {last_epoch_error} {current_epoch_error} ", current_patiance)
     else:
@@ -187,7 +191,11 @@ while True: # Loop de épocas
 
 weights_matrix = best_wheights_matrix
 
-confusion_matrix = {}
+confusion_matrix = {
+    "H": { "H": 0, "D": 0, "A": 0 },
+    "A": { "H": 0, "D": 0, "A": 0 },
+    "D": { "H": 0, "D": 0, "A": 0 },
+}
 acertou = 0
 errou = 0
 for test_row_index, test_row in enumerate(test_data):
@@ -201,10 +209,6 @@ for test_row_index, test_row in enumerate(test_data):
     else:
         errou += 1
 
-    if expected_result not in confusion_matrix:
-        confusion_matrix[expected_result] = {}
-    if calculated_result not in confusion_matrix[expected_result]:
-        confusion_matrix[expected_result][calculated_result] = 0
     confusion_matrix[expected_result][calculated_result] += 1
 
     print("TEST ROW ----- ")
@@ -213,23 +217,37 @@ for test_row_index, test_row in enumerate(test_data):
     print(f'calculated_result: {calculated_result}')
     print(f'test_y[test_row_index]: {test_y[test_row_index]}')
 
-print(f'Erro final considerado: {last_epoch_error}')
+log_buffer = ''
+def log(s):
+    global log_buffer 
+    log_buffer += s + '\n'
+    print(s)
 
-print("Confusion Matrix:")
+log(f'used_headers {headers}')
+
+log(f'Erro final considerado: {last_epoch_error}')
+
+log("Confusion Matrix:")
 for key, values in confusion_matrix.items():
-    print(f'{key} | {values}')
+    log(f'{key} | {values}')
 
 for key, values in confusion_matrix.items():
-    print(f"Parâmetros do resultado:  {key}")
+    log(f"Parâmetros do resultado:  {key}")
     vps = confusion_matrix[key][key]
     fns_vps = sum(confusion_matrix[key].values())
     fps_vps = sum(map(lambda values: values[key], confusion_matrix.values()))
 
-    print(f"Recall: {vps / fns_vps} ({vps}, {fns_vps})")
-    print(f'Precision: {vps / fps_vps} ({vps}, {fps_vps})')
+    recall = vps / fns_vps
+    precision = vps / fps_vps
+    f1 = 2 * precision * recall / (precision + recall)
+    log(f"Recall: {recall} ({vps}, {fns_vps})")
+    log(f'Precision: {precision} ({vps}, {fps_vps})')
+    log(f'F1-score: {f1} ({vps}, {fps_vps})')
 
-print(f'acertou: {acertou}')
-print(f'errou: {errou}')
-print(f'Acurácia: {acertou * 100 / len(test_data)} {len(test_data)}')
-with open("Output.txt", "w") as text_file:
+log(f'acertou: {acertou}')
+log(f'errou: {errou}')
+log(f'Acurácia: {acertou * 100 / len(test_data)} {len(test_data)}')
+
+with open(f"Output{time.time()}.txt", "w") as text_file:
+    text_file.write(log_buffer)
     text_file.write(json.dumps(weights_matrix))
