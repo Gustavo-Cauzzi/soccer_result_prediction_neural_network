@@ -15,12 +15,14 @@ class Neuron:
 
 data = []
 y = []
-test_data_ratio = 0.2 # 10% dos dados serão separados para teste
+test_data_ratio = 0.2
 learning_ratio = 0.3    
 MAX_PATIANCE = 5
 
 result_row = 'FTR'
+
 unused_headers = ['FTHG', 'FTAG', 'HTR', 'HomeTeam', 'AwayTeam', 'ID'] 
+# Usados: ['FTAG', 'HTHG', 'HTAG', 'HS', 'AS', 'HST', 'AST', 'HF', 'AF', 'HC', 'AC', 'HY', 'AY', 'HR', 'AR']
 
 with open("./Dataset_futebol.csv", 'r') as file:
     reader = csv.reader(file, delimiter=";")
